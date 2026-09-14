@@ -1,6 +1,6 @@
 --[[
     MasensDev V1.0 Soreya
-    Roblox Multi-Feature Teleport & Utility Hub (With Key System)
+    Roblox Multi-Feature Teleport & Utility Hub (Fixed Auto TP Loop Freeze)
 ]]
 
 local Players = game:GetService("Players")
@@ -75,13 +75,19 @@ local function copyToClipboardText(text)
 	end
 end
 
+-- Teleport Fungsi Terproteksi (Aman dari Character Reset & Streaming Issue)
 local function teleportToPosition(vectorPos)
-	local char = LocalPlayer.Character
-	if char and char:FindFirstChild("HumanoidRootPart") then
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char:WaitForChild("HumanoidRootPart", 3)
+	
+	if hrp then
 		if LocalPlayer.RequestStreamAroundAsync then
-			LocalPlayer:RequestStreamAroundAsync(vectorPos)
+			pcall(function()
+				LocalPlayer:RequestStreamAroundAsync(vectorPos)
+			end)
 		end
-		char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 3, 0)))
+		-- Set posisi karakter dengan offset sedikit lebih rendah agar pasti menyentuh part checkpoint
+		char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 1.5, 0)))
 	end
 end
 
@@ -520,7 +526,7 @@ plDropBtn.MouseButton1Click:Connect(function()
 	plScroll.Visible = not plScroll.Visible
 end)
 
--- TELEPORT KE PEMAIN (LONG-DISTANCE / STREAMING Bypassed)
+-- TELEPORT KE PEMAIN
 createButton(mainPage, "Teleport ke Pemain Target", Color3.fromRGB(0, 160, 150), function()
 	if not selectedPlayerTarget then updatePlayerList() end
 	
@@ -662,32 +668,35 @@ createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(180, 50, 70),
 end)
 
 ----------------------------------------------------
--- BACKGROUND LOOPS (NOCLIP & FOLLOW)
+-- BACKGROUND LOOPS (FIXED STUCK & FREEZE ISSUES)
 ----------------------------------------------------
 
--- Auto Teleport Map Loop
+-- Auto Teleport Map Loop (Diberi Anti-Stuck & Safe Retries)
 task.spawn(function()
 	while true do
 		task.wait(tpDelay)
 		if autoEnabled then
-			local currentStage = getPlayerStage()
-			if currentStage >= 20 then
-				teleportToPosition(checkpointCoords["Summit"])
-				task.wait(tpDelay)
-				if autoEnabled then
-					teleportToPosition(checkpointCoords["BC"])
+			pcall(function()
+				local currentStage = getPlayerStage()
+				
+				if currentStage >= 20 then
+					teleportToPosition(checkpointCoords["Summit"])
 					task.wait(tpDelay)
 					if autoEnabled then
-						teleportToPosition(checkpointCoords["Checkpoint 1"])
+						teleportToPosition(checkpointCoords["BC"])
+						task.wait(tpDelay)
+						if autoEnabled then
+							teleportToPosition(checkpointCoords["Checkpoint 1"])
+						end
+					end
+				else
+					local nextStage = currentStage + 1
+					local targetKey = "Checkpoint " .. nextStage
+					if checkpointCoords[targetKey] then
+						teleportToPosition(checkpointCoords[targetKey])
 					end
 				end
-			else
-				local nextStage = currentStage + 1
-				local targetKey = "Checkpoint " .. nextStage
-				if checkpointCoords[targetKey] then
-					teleportToPosition(checkpointCoords[targetKey])
-				end
-			end
+			end)
 		end
 	end
 end)
