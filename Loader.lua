@@ -1,6 +1,6 @@
 --[[
     MasensDev V1.0 Soreya
-    Roblox Multi-Feature Teleport & Utility Hub (Fixed Auto TP Loop Freeze)
+    Roblox Multi-Feature Teleport & Utility Hub (Fixed Auto Loop Death & Teleport Crash)
 ]]
 
 local Players = game:GetService("Players")
@@ -75,33 +75,42 @@ local function copyToClipboardText(text)
 	end
 end
 
--- Teleport Fungsi Terproteksi (Aman dari Character Reset & Streaming Issue)
+-- Teleport Fungsi Aman (Self-Healing)
 local function teleportToPosition(vectorPos)
-	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local hrp = char:WaitForChild("HumanoidRootPart", 3)
+	if not vectorPos then return end
 	
-	if hrp then
-		if LocalPlayer.RequestStreamAroundAsync then
-			pcall(function()
-				LocalPlayer:RequestStreamAroundAsync(vectorPos)
-			end)
+	pcall(function()
+		local char = LocalPlayer.Character
+		if not char or not char:Parent then
+			char = LocalPlayer.CharacterAdded:Wait()
 		end
-		-- Set posisi karakter dengan offset sedikit lebih rendah agar pasti menyentuh part checkpoint
-		char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 1.5, 0)))
-	end
+		
+		local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 2)
+		if hrp then
+			if LocalPlayer.RequestStreamAroundAsync then
+				pcall(function()
+					LocalPlayer:RequestStreamAroundAsync(vectorPos)
+				end)
+			end
+			char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 1.5, 0)))
+		end
+	end)
 end
 
 local function getPlayerStage()
-	local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-	if leaderstats then
-		local cpValueObj = leaderstats:FindFirstChild("Checkpoint")
-		if cpValueObj then
-			local rawVal = tostring(cpValueObj.Value)
-			local parsedNumber = tonumber(rawVal:match("%d+"))
-			if parsedNumber then return parsedNumber end
+	local success, stage = pcall(function()
+		local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+		if leaderstats then
+			local cpValueObj = leaderstats:FindFirstChild("Checkpoint")
+			if cpValueObj then
+				local rawVal = tostring(cpValueObj.Value)
+				local parsedNumber = tonumber(rawVal:match("%d+"))
+				if parsedNumber then return parsedNumber end
+			end
 		end
-	end
-	return 0
+		return 0
+	end)
+	return success and stage or 0
 end
 
 local function makeDraggable(gui)
@@ -455,7 +464,9 @@ end
 cpDropBtn.MouseButton1Click:Connect(function() cpScroll.Visible = not cpScroll.Visible end)
 
 createButton(mainPage, "Teleport Manual Ke Map", Color3.fromRGB(0, 140, 210), function()
-	if selectedCoord then teleportToPosition(selectedCoord) end
+	if selectedCoord then 
+		teleportToPosition(selectedCoord) 
+	end
 end)
 
 createToggle(mainPage, "Auto Teleport Map", function(enabled)
@@ -532,26 +543,20 @@ createButton(mainPage, "Teleport ke Pemain Target", Color3.fromRGB(0, 160, 150),
 	
 	if selectedPlayerTarget then
 		task.spawn(function()
-			local myChar = LocalPlayer.Character
-			if not myChar then return end
-			
-			if selectedPlayerTarget.Character and selectedPlayerTarget.Character:FindFirstChild("HumanoidRootPart") then
-				local targetCFrame = selectedPlayerTarget.Character:GetPivot()
-				if LocalPlayer.RequestStreamAroundAsync then
-					LocalPlayer:RequestStreamAroundAsync(targetCFrame.Position)
-				end
-				myChar:PivotTo(targetCFrame * CFrame.new(0, 0, -3))
-			else
-				local targetChar = selectedPlayerTarget.Character or selectedPlayerTarget.CharacterAdded:Wait()
-				local targetHrp = targetChar:WaitForChild("HumanoidRootPart", 3)
+			pcall(function()
+				local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+				local targetChar = selectedPlayerTarget.Character
 				
-				if targetHrp then
-					if LocalPlayer.RequestStreamAroundAsync then
-						LocalPlayer:RequestStreamAroundAsync(targetHrp.Position)
+				if targetChar then
+					local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+					if targetHrp then
+						if LocalPlayer.RequestStreamAroundAsync then
+							pcall(function() LocalPlayer:RequestStreamAroundAsync(targetHrp.Position) end)
+						end
+						myChar:PivotTo(targetHrp.CFrame * CFrame.new(0, 0, -3))
 					end
-					myChar:PivotTo(targetHrp.CFrame * CFrame.new(0, 0, -3))
 				end
-			end
+			end)
 		end)
 	end
 end)
@@ -668,16 +673,31 @@ createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(180, 50, 70),
 end)
 
 ----------------------------------------------------
--- BACKGROUND LOOPS (FIXED STUCK & FREEZE ISSUES)
+-- BACKGROUND LOOPS (FULLY ISOLATED & SAFE)
 ----------------------------------------------------
 
--- Auto Teleport Map Loop (Diberi Anti-Stuck & Safe Retries)
+-- Auto Teleport Map Loop (Anti-Crash & Self-Healing Loop)
 task.spawn(function()
+	local lastStage = -1
+	local stuckCount = 0
+
 	while true do
 		task.wait(tpDelay)
 		if autoEnabled then
 			pcall(function()
 				local currentStage = getPlayerStage()
+				
+				-- Anti-Stuck Logic
+				if currentStage == lastStage then
+					stuckCount = stuckCount + 1
+					if stuckCount >= 3 then
+						currentStage = currentStage + 1
+						stuckCount = 0
+					end
+				else
+					stuckCount = 0
+					lastStage = currentStage
+				end
 				
 				if currentStage >= 20 then
 					teleportToPosition(checkpointCoords["Summit"])
@@ -701,25 +721,27 @@ task.spawn(function()
 	end
 end)
 
--- CONTINUOUS LOOP (NOCLIP & FOLLOW WITH STREAMING FETCH)
+-- CONTINUOUS LOOP (NOCLIP & FOLLOW SAFE)
 RunService.Stepped:Connect(function()
-	if noclipEnabled and LocalPlayer.Character then
-		for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
-			if v:IsA("BasePart") then v.CanCollide = false end
-		end
-	end
-	
-	if followEnabled and selectedPlayerTarget and selectedPlayerTarget.Character then
-		local myChar = LocalPlayer.Character
-		local targetChar = selectedPlayerTarget.Character
-		
-		if myChar and targetChar then
-			local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
-			if targetHrp then
-				myChar:PivotTo(targetHrp.CFrame * CFrame.new(0, 0, 1.5))
+	pcall(function()
+		if noclipEnabled and LocalPlayer.Character then
+			for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+				if v:IsA("BasePart") then v.CanCollide = false end
 			end
 		end
-	end
+		
+		if followEnabled and selectedPlayerTarget and selectedPlayerTarget.Character then
+			local myChar = LocalPlayer.Character
+			local targetChar = selectedPlayerTarget.Character
+			
+			if myChar and targetChar then
+				local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
+				if targetHrp then
+					myChar:PivotTo(targetHrp.CFrame * CFrame.new(0, 0, 1.5))
+				end
+			end
+		end
+	end)
 end)
 
 -- Infinite Jump Action
