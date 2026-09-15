@@ -1,6 +1,6 @@
 --[[
     MasensDev V1.0 Soreya
-    Roblox Multi-Feature Teleport & Utility Hub (Fixed Auto Loop Death & Teleport Crash)
+    Roblox Multi-Feature Teleport & Utility Hub (Clean Fix)
 ]]
 
 local Players = game:GetService("Players")
@@ -75,22 +75,14 @@ local function copyToClipboardText(text)
 	end
 end
 
--- Teleport Fungsi Aman (Self-Healing)
 local function teleportToPosition(vectorPos)
 	if not vectorPos then return end
-	
 	pcall(function()
-		local char = LocalPlayer.Character
-		if not char or not char:Parent then
-			char = LocalPlayer.CharacterAdded:Wait()
-		end
-		
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 		local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 2)
 		if hrp then
 			if LocalPlayer.RequestStreamAroundAsync then
-				pcall(function()
-					LocalPlayer:RequestStreamAroundAsync(vectorPos)
-				end)
+				pcall(function() LocalPlayer:RequestStreamAroundAsync(vectorPos) end)
 			end
 			char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 1.5, 0)))
 		end
@@ -151,7 +143,7 @@ elseif CoreGui:FindFirstChild("RobloxGui") then ScreenGui.Parent = CoreGui
 else ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 ----------------------------------------------------
--- KEY SYSTEM GUI (AWAL)
+-- KEY SYSTEM GUI
 ----------------------------------------------------
 local KeyFrame = Instance.new("Frame")
 KeyFrame.Name = "KeySystemFrame"
@@ -224,7 +216,6 @@ CheckKeyBtn.Font = Enum.Font.Gotham
 CheckKeyBtn.TextSize = 12
 Instance.new("UICorner", CheckKeyBtn).CornerRadius = UDim.new(0, 8)
 
--- Action Get Key
 GetKeyBtn.MouseButton1Click:Connect(function()
 	copyToClipboardText(DEFAULT_GET_KEY)
 	GetKeyBtn.Text = "Copied!"
@@ -235,10 +226,8 @@ GetKeyBtn.MouseButton1Click:Connect(function()
 end)
 
 ----------------------------------------------------
--- MAIN HUB GUI & CONTROLS (AWALNYA HIDDEN)
+-- MAIN HUB GUI
 ----------------------------------------------------
-
--- Tombol Open Ringkas "MD"
 local OpenBtn = Instance.new("TextButton")
 OpenBtn.Name = "OpenHubButton"
 OpenBtn.Size = UDim2.new(0, 40, 0, 40)
@@ -254,7 +243,6 @@ OpenBtn.Parent = ScreenGui
 Instance.new("UICorner", OpenBtn).CornerRadius = UDim.new(0, 10)
 makeDraggable(OpenBtn)
 
--- Main Frame Container
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 520, 0, 340)
@@ -266,7 +254,6 @@ MainFrame.Visible = false
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 makeDraggable(MainFrame)
 
--- Action Check Key Validation
 CheckKeyBtn.MouseButton1Click:Connect(function()
 	local inputKey = KeyInputBox.Text
 	if VALID_KEYS[inputKey] then
@@ -282,7 +269,6 @@ CheckKeyBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Top Bar Header
 local TopBar = Instance.new("Frame", MainFrame)
 TopBar.Size = UDim2.new(1, 0, 0, 35)
 TopBar.BackgroundColor3 = Color3.fromRGB(15, 23, 36)
@@ -313,7 +299,6 @@ Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.Visible end)
 
--- Sidebar Container
 local SideBar = Instance.new("Frame", MainFrame)
 SideBar.Size = UDim2.new(0, 130, 1, -45)
 SideBar.Position = UDim2.new(0, 8, 0, 40)
@@ -327,7 +312,6 @@ SideList.SortOrder = Enum.SortOrder.LayoutOrder
 Instance.new("UIPadding", SideBar).PaddingTop = UDim.new(0, 8)
 Instance.new("UIPadding", SideBar).PaddingLeft = UDim.new(0, 6)
 
--- Content Pages Container
 local ContentFrame = Instance.new("Frame", MainFrame)
 ContentFrame.Size = UDim2.new(1, -154, 1, -45)
 ContentFrame.Position = UDim2.new(0, 146, 0, 40)
@@ -360,7 +344,6 @@ local mainPage = createPage("Main")
 local miscPage = createPage("Misc")
 local settingsPage = createPage("Settings")
 
--- Navigation Tabs
 local tabButtons = {}
 local function addTab(name, layoutOrder)
 	local btn = Instance.new("TextButton", SideBar)
@@ -428,7 +411,6 @@ end
 ----------------------------------------------------
 -- TAB 1: MAIN
 ----------------------------------------------------
--- Map Teleport Dropdown
 local cpDropBtn = createButton(mainPage, "Pilih Map Target... ▼", Color3.fromRGB(25, 35, 50))
 local cpScroll = Instance.new("ScrollingFrame", mainPage)
 cpScroll.Size = UDim2.new(1, -10, 0, 100)
@@ -464,16 +446,13 @@ end
 cpDropBtn.MouseButton1Click:Connect(function() cpScroll.Visible = not cpScroll.Visible end)
 
 createButton(mainPage, "Teleport Manual Ke Map", Color3.fromRGB(0, 140, 210), function()
-	if selectedCoord then 
-		teleportToPosition(selectedCoord) 
-	end
+	if selectedCoord then teleportToPosition(selectedCoord) end
 end)
 
 createToggle(mainPage, "Auto Teleport Map", function(enabled)
 	autoEnabled = enabled
 end)
 
--- Delay Speed Adjuster
 local speedFrame = Instance.new("Frame", mainPage)
 speedFrame.Size = UDim2.new(1, -10, 0, 32)
 speedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
@@ -504,7 +483,6 @@ end)
 plusDelay.Size = UDim2.new(0, 30, 0, 24)
 plusDelay.Position = UDim2.new(1, -35, 0, 4)
 
--- Player Teleport Dropdown
 local plDropBtn = createButton(mainPage, "Pilih Pemain Target... ▼", Color3.fromRGB(25, 35, 50))
 local plScroll = Instance.new("ScrollingFrame", mainPage)
 plScroll.Size = UDim2.new(1, -10, 0, 90)
@@ -537,16 +515,13 @@ plDropBtn.MouseButton1Click:Connect(function()
 	plScroll.Visible = not plScroll.Visible
 end)
 
--- TELEPORT KE PEMAIN
 createButton(mainPage, "Teleport ke Pemain Target", Color3.fromRGB(0, 160, 150), function()
 	if not selectedPlayerTarget then updatePlayerList() end
-	
 	if selectedPlayerTarget then
 		task.spawn(function()
 			pcall(function()
 				local myChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 				local targetChar = selectedPlayerTarget.Character
-				
 				if targetChar then
 					local targetHrp = targetChar:FindFirstChild("HumanoidRootPart")
 					if targetHrp then
@@ -673,10 +648,8 @@ createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(180, 50, 70),
 end)
 
 ----------------------------------------------------
--- BACKGROUND LOOPS (FULLY ISOLATED & SAFE)
+-- BACKGROUND LOOPS
 ----------------------------------------------------
-
--- Auto Teleport Map Loop (Anti-Crash & Self-Healing Loop)
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -687,7 +660,6 @@ task.spawn(function()
 			pcall(function()
 				local currentStage = getPlayerStage()
 				
-				-- Anti-Stuck Logic
 				if currentStage == lastStage then
 					stuckCount = stuckCount + 1
 					if stuckCount >= 3 then
@@ -721,7 +693,6 @@ task.spawn(function()
 	end
 end)
 
--- CONTINUOUS LOOP (NOCLIP & FOLLOW SAFE)
 RunService.Stepped:Connect(function()
 	pcall(function()
 		if noclipEnabled and LocalPlayer.Character then
@@ -744,14 +715,12 @@ RunService.Stepped:Connect(function()
 	end)
 end)
 
--- Infinite Jump Action
 UserInputService.JumpRequest:Connect(function()
 	if infJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
 		LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
 	end
 end)
 
--- Anti-AFK Simulation
 local VirtualUser = game:GetService("VirtualUser")
 LocalPlayer.Idled:Connect(function()
 	if antiAfkEnabled then
@@ -760,7 +729,6 @@ LocalPlayer.Idled:Connect(function()
 	end
 end)
 
--- Respawn Listener
 LocalPlayer.CharacterAdded:Connect(function(char)
 	local hum = char:WaitForChild("Humanoid", 5)
 	if hum then
