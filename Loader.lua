@@ -1,13 +1,12 @@
 --[[
     MasensDev V1.0 Soreya
-    Roblox Multi-Feature Teleport & Utility Hub (Clean Fix + Fly Checkpoint)
+    Roblox Multi-Feature Teleport & Utility Hub (Clean Fix)
 ]]
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
-local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -25,7 +24,6 @@ local VALID_KEYS = {
 local DEFAULT_GET_KEY = "https://link-center.net/9347872/iYyFL35U077Q"
 
 local autoEnabled = false
-local autoFlyEnabled = false
 local noclipEnabled = false
 local infJumpEnabled = false
 local invisibleEnabled = false
@@ -33,7 +31,6 @@ local followEnabled = false
 local antiAfkEnabled = false
 
 local tpDelay = 1.5
-local flySpeed = 100 -- Kecepatan terbang (Studs per detik)
 local walkSpeedValue = 16
 local jumpPowerValue = 50
 local selectedPlayerTarget = nil
@@ -92,36 +89,6 @@ local function teleportToPosition(vectorPos)
 	end)
 end
 
--- Function Terbang Smooth menuju Koordinat (Anti 2-Menit Freeze)
-local currentFlyTween = nil
-local function flyToPosition(vectorPos)
-	if not vectorPos then return end
-	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 2)
-	if not hrp then return end
-
-	local distance = (hrp.Position - vectorPos).Magnitude
-	local duration = distance / math.max(10, flySpeed)
-
-	if currentFlyTween then pcall(function() currentFlyTween:Cancel() end) end
-
-	local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-	currentFlyTween = TweenService:Create(hrp, info, {CFrame = CFrame.new(vectorPos + Vector3.new(0, 1.5, 0))})
-	currentFlyTween:Play()
-
-	local start = os.clock()
-	while autoFlyEnabled and (os.clock() - start) < (duration + 0.2) do
-		task.wait(0.1)
-		if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			break
-		end
-	end
-
-	if not autoFlyEnabled and currentFlyTween then
-		pcall(function() currentFlyTween:Cancel() end)
-	end
-end
-
 local function getPlayerStage()
 	local success, stage = pcall(function()
 		local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
@@ -164,7 +131,7 @@ local function makeDraggable(gui)
 end
 
 ----------------------------------------------------
--- GUI LAYOUT CONTAINER (DENGAN STRUKTUR ASLI ANDA)
+-- GUI LAYOUT CONTAINER
 ----------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MasensDevHub_V1"
@@ -278,7 +245,7 @@ makeDraggable(OpenBtn)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 520, 0, 360)
+MainFrame.Size = UDim2.new(0, 520, 0, 340)
 MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
 MainFrame.BackgroundTransparency = 0.6
@@ -484,45 +451,7 @@ end)
 
 createToggle(mainPage, "Auto Teleport Map", function(enabled)
 	autoEnabled = enabled
-	if enabled and autoFlyEnabled then autoFlyEnabled = false end
 end)
-
--- FITUR BARU: AUTO CHECKPOINT TERBANG
-createToggle(mainPage, "Auto Checkpoint Terbang", function(enabled)
-	autoFlyEnabled = enabled
-	if enabled and autoEnabled then autoEnabled = false end
-end)
-
--- CONTROL KECEPATAN TERBANG
-local flySpeedFrame = Instance.new("Frame", mainPage)
-flySpeedFrame.Size = UDim2.new(1, -10, 0, 32)
-flySpeedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-flySpeedFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", flySpeedFrame).CornerRadius = UDim.new(0, 8)
-
-local flySpeedLabel = Instance.new("TextLabel", flySpeedFrame)
-flySpeedLabel.Size = UDim2.new(0.6, 0, 1, 0)
-flySpeedLabel.Position = UDim2.new(0, 8, 0, 0)
-flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
-flySpeedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-flySpeedLabel.Font = Enum.Font.Gotham
-flySpeedLabel.TextSize = 11
-flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local minusFlySpeed = createButton(flySpeedFrame, "-", Color3.fromRGB(40, 50, 65), function()
-	flySpeed = math.max(10, flySpeed - 20)
-	flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
-end)
-minusFlySpeed.Size = UDim2.new(0, 30, 0, 24)
-minusFlySpeed.Position = UDim2.new(1, -70, 0, 4)
-
-local plusFlySpeed = createButton(flySpeedFrame, "+", Color3.fromRGB(40, 50, 65), function()
-	flySpeed = flySpeed + 20
-	flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
-end)
-plusFlySpeed.Size = UDim2.new(0, 30, 0, 24)
-plusFlySpeed.Position = UDim2.new(1, -35, 0, 4)
 
 local speedFrame = Instance.new("Frame", mainPage)
 speedFrame.Size = UDim2.new(1, -10, 0, 32)
@@ -721,7 +650,6 @@ end)
 ----------------------------------------------------
 -- BACKGROUND LOOPS
 ----------------------------------------------------
--- Loop Auto Teleport Instant
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -765,26 +693,9 @@ task.spawn(function()
 	end
 end)
 
--- Loop Auto Checkpoint Terbang (Baru)
-task.spawn(function()
-	while true do
-		task.wait(0.2)
-		if autoFlyEnabled then
-			pcall(function()
-				local currentStage = getPlayerStage()
-				local targetKey = (currentStage >= 20) and "Summit" or ("Checkpoint " .. (currentStage + 1))
-				
-				if checkpointCoords[targetKey] then
-					flyToPosition(checkpointCoords[targetKey])
-				end
-			end)
-		end
-	end
-end)
-
 RunService.Stepped:Connect(function()
 	pcall(function()
-		if (noclipEnabled or autoFlyEnabled) and LocalPlayer.Character then
+		if noclipEnabled and LocalPlayer.Character then
 			for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
 				if v:IsA("BasePart") then v.CanCollide = false end
 			end
@@ -820,7 +731,7 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
 	local hum = char:WaitForChild("Humanoid", 5)
-	if hum me
+	if hum then
 		hum.WalkSpeed = walkSpeedValue
 		hum.UseJumpPower = true
 		hum.JumpPower = jumpPowerValue
