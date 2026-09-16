@@ -1,5 +1,5 @@
 --[[
-    MasensDev V1.0 Soreya (Fixed UI Parent & Fly Checkpoint)
+    MasensDev V1.0 Soreya (Fixed UI Parent, Flying Logic, & Cache)
     Roblox Multi-Feature Teleport & Utility Hub
 ]]
 
@@ -105,7 +105,7 @@ local function teleportToPosition(vectorPos)
 	end)
 end
 
--- Smooth Fly Movement (Terbang ke Koordinat)
+-- Smooth Fly Movement (Robust Timeout Version)
 local currentTween = nil
 local function flyToPosition(targetPos)
 	if not targetPos then return end
@@ -117,25 +117,22 @@ local function flyToPosition(targetPos)
 	local distance = (hrp.Position - targetPos).Magnitude
 	local travelTime = distance / math.max(10, flySpeed)
 
-	if currentTween then currentTween:Cancel() end
+	if currentTween then pcall(function() currentTween:Cancel() end) end
 
 	local tweenInfo = TweenInfo.new(travelTime, Enum.EasingStyle.Linear)
 	currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))})
 	currentTween:Play()
 	
-	local completed = false
-	local conn
-	conn = currentTween.Completed:Connect(function()
-		completed = true
-		if conn then conn:Disconnect() end
-	end)
-
-	while not completed and autoFlyEnabled do
+	local startTime = os.clock()
+	while autoFlyEnabled and (os.clock() - startTime) < (travelTime + 0.5) do
 		task.wait(0.1)
+		if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			break
+		end
 	end
-	
+
 	if not autoFlyEnabled and currentTween then
-		currentTween:Cancel()
+		pcall(function() currentTween:Cancel() end)
 	end
 end
 
@@ -187,22 +184,14 @@ local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MasensDevHub_V1"
 ScreenGui.ResetOnSpawn = false
 
-local parentSuccess = false
+-- Always default to PlayerGui if CoreGui/gethui fails
+local targetParent = LocalPlayer:WaitForChild("PlayerGui")
 if gethui then
-	pcall(function()
-		ScreenGui.Parent = gethui()
-		parentSuccess = true
-	end)
+	pcall(function() targetParent = gethui() end)
+elseif CoreGui:FindFirstChild("RobloxGui") then
+	pcall(function() targetParent = CoreGui end)
 end
-if not parentSuccess then
-	pcall(function()
-		ScreenGui.Parent = CoreGui
-		parentSuccess = true
-	end)
-end
-if not parentSuccess then
-	ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+ScreenGui.Parent = targetParent
 
 ----------------------------------------------------
 -- KEY SYSTEM GUI
