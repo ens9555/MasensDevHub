@@ -1,5 +1,5 @@
 --[[
-    MasensDev V1.0 Soreya (Updated with Fly Checkpoint)
+    MasensDev V1.0 Soreya (Fixed UI Parent & Fly Checkpoint)
     Roblox Multi-Feature Teleport & Utility Hub
 ]]
 
@@ -8,12 +8,23 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
--- Clean Up Old GUI
-local existingGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("MasensDevHub_V1")
-if existingGui then existingGui:Destroy() end
+----------------------------------------------------
+-- CLEAN UP OLD GUI
+----------------------------------------------------
+local function removeOldGui(parent)
+	if parent then
+		local old = parent:FindFirstChild("MasensDevHub_V1")
+		if old then old:Destroy() end
+	end
+end
+
+pcall(function() removeOldGui(LocalPlayer:FindFirstChild("PlayerGui")) end)
+pcall(function() removeOldGui(CoreGui) end)
+pcall(function() if gethui then removeOldGui(gethui()) end end)
 
 ----------------------------------------------------
 -- SYSTEM VARIABLES & VALID KEYS
@@ -78,7 +89,7 @@ local function copyToClipboardText(text)
 	end
 end
 
--- Teleport Instant Fix
+-- Teleport Instant Safe
 local function teleportToPosition(vectorPos)
 	if not vectorPos then return end
 	pcall(function()
@@ -94,7 +105,7 @@ local function teleportToPosition(vectorPos)
 	end)
 end
 
--- Smooth Fly Movement
+-- Smooth Fly Movement (Terbang ke Koordinat)
 local currentTween = nil
 local function flyToPosition(targetPos)
 	if not targetPos then return end
@@ -170,16 +181,28 @@ local function makeDraggable(gui)
 end
 
 ----------------------------------------------------
--- GUI CONTAINER
+-- GUI CONTAINER (SAFE PARENTING FIX)
 ----------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MasensDevHub_V1"
 ScreenGui.ResetOnSpawn = false
 
-local CoreGui = game:GetService("CoreGui")
-if gethui then ScreenGui.Parent = gethui()
-elseif CoreGui:FindFirstChild("RobloxGui") then ScreenGui.Parent = CoreGui
-else ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+local parentSuccess = false
+if gethui then
+	pcall(function()
+		ScreenGui.Parent = gethui()
+		parentSuccess = true
+	end)
+end
+if not parentSuccess then
+	pcall(function()
+		ScreenGui.Parent = CoreGui
+		parentSuccess = true
+	end)
+end
+if not parentSuccess then
+	ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
 ----------------------------------------------------
 -- KEY SYSTEM GUI
@@ -493,13 +516,11 @@ createToggle(mainPage, "Auto Teleport Map", function(enabled)
 	if enabled and autoFlyEnabled then autoFlyEnabled = false end
 end)
 
--- TOMBOL AUTO CHECKPOINT TERBANG (BARU)
 createToggle(mainPage, "Auto Checkpoint Terbang", function(enabled)
 	autoFlyEnabled = enabled
 	if enabled and autoEnabled then autoEnabled = false end
 end)
 
--- CONTROL FLY SPEED
 local flySpeedFrame = Instance.new("Frame", mainPage)
 flySpeedFrame.Size = UDim2.new(1, -10, 0, 32)
 flySpeedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
@@ -725,10 +746,8 @@ createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(180, 50, 70),
 end)
 
 ----------------------------------------------------
--- BACKGROUND LOOPS & LOGIC
+-- BACKGROUND LOOPS
 ----------------------------------------------------
-
--- Auto Teleport Instant Loop (Fixed Character Dynamic Retrieval)
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -772,7 +791,6 @@ task.spawn(function()
 	end
 end)
 
--- Auto Checkpoint Terbang Loop (New)
 task.spawn(function()
 	while true do
 		task.wait(0.2)
@@ -789,7 +807,6 @@ task.spawn(function()
 	end
 end)
 
--- Loop Noclip & Follow
 RunService.Stepped:Connect(function()
 	pcall(function()
 		if (noclipEnabled or autoFlyEnabled) and LocalPlayer.Character then
