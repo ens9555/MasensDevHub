@@ -1,6 +1,6 @@
 --[[
-    MasensDev V1.0 Soreya (Fixed UI Parent, Flying Logic, & Cache)
-    Roblox Multi-Feature Teleport & Utility Hub
+    MasensDev V1.0 Soreya
+    Roblox Multi-Feature Teleport & Utility Hub (Clean Fix + Fly Checkpoint)
 ]]
 
 local Players = game:GetService("Players")
@@ -8,23 +8,12 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local TweenService = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
-----------------------------------------------------
--- CLEAN UP OLD GUI
-----------------------------------------------------
-local function removeOldGui(parent)
-	if parent then
-		local old = parent:FindFirstChild("MasensDevHub_V1")
-		if old then old:Destroy() end
-	end
-end
-
-pcall(function() removeOldGui(LocalPlayer:FindFirstChild("PlayerGui")) end)
-pcall(function() removeOldGui(CoreGui) end)
-pcall(function() if gethui then removeOldGui(gethui()) end end)
+-- Clean Up Old GUI
+local existingGui = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("MasensDevHub_V1")
+if existingGui then existingGui:Destroy() end
 
 ----------------------------------------------------
 -- SYSTEM VARIABLES & VALID KEYS
@@ -89,13 +78,11 @@ local function copyToClipboardText(text)
 	end
 end
 
--- Teleport Instant Safe
 local function teleportToPosition(vectorPos)
 	if not vectorPos then return end
 	pcall(function()
-		local char = LocalPlayer.Character
-		if not char or not char:Parent then return end
-		local hrp = char:FindFirstChild("HumanoidRootPart")
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 2)
 		if hrp then
 			if LocalPlayer.RequestStreamAroundAsync then
 				pcall(function() LocalPlayer:RequestStreamAroundAsync(vectorPos) end)
@@ -105,34 +92,33 @@ local function teleportToPosition(vectorPos)
 	end)
 end
 
--- Smooth Fly Movement (Robust Timeout Version)
-local currentTween = nil
-local function flyToPosition(targetPos)
-	if not targetPos then return end
-	local char = LocalPlayer.Character
-	if not char then return end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
+-- Function Terbang Smooth menuju Koordinat (Anti 2-Menit Freeze)
+local currentFlyTween = nil
+local function flyToPosition(vectorPos)
+	if not vectorPos then return end
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 2)
 	if not hrp then return end
 
-	local distance = (hrp.Position - targetPos).Magnitude
-	local travelTime = distance / math.max(10, flySpeed)
+	local distance = (hrp.Position - vectorPos).Magnitude
+	local duration = distance / math.max(10, flySpeed)
 
-	if currentTween then pcall(function() currentTween:Cancel() end) end
+	if currentFlyTween then pcall(function() currentFlyTween:Cancel() end) end
 
-	local tweenInfo = TweenInfo.new(travelTime, Enum.EasingStyle.Linear)
-	currentTween = TweenService:Create(hrp, tweenInfo, {CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))})
-	currentTween:Play()
-	
-	local startTime = os.clock()
-	while autoFlyEnabled and (os.clock() - startTime) < (travelTime + 0.5) do
+	local info = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+	currentFlyTween = TweenService:Create(hrp, info, {CFrame = CFrame.new(vectorPos + Vector3.new(0, 1.5, 0))})
+	currentFlyTween:Play()
+
+	local start = os.clock()
+	while autoFlyEnabled and (os.clock() - start) < (duration + 0.2) do
 		task.wait(0.1)
 		if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
 			break
 		end
 	end
 
-	if not autoFlyEnabled and currentTween then
-		pcall(function() currentTween:Cancel() end)
+	if not autoFlyEnabled and currentFlyTween then
+		pcall(function() currentFlyTween:Cancel() end)
 	end
 end
 
@@ -178,20 +164,16 @@ local function makeDraggable(gui)
 end
 
 ----------------------------------------------------
--- GUI CONTAINER (SAFE PARENTING FIX)
+-- GUI LAYOUT CONTAINER (DENGAN STRUKTUR ASLI ANDA)
 ----------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MasensDevHub_V1"
 ScreenGui.ResetOnSpawn = false
 
--- Always default to PlayerGui if CoreGui/gethui fails
-local targetParent = LocalPlayer:WaitForChild("PlayerGui")
-if gethui then
-	pcall(function() targetParent = gethui() end)
-elseif CoreGui:FindFirstChild("RobloxGui") then
-	pcall(function() targetParent = CoreGui end)
-end
-ScreenGui.Parent = targetParent
+local CoreGui = game:GetService("CoreGui")
+if gethui then ScreenGui.Parent = gethui()
+elseif CoreGui:FindFirstChild("RobloxGui") then ScreenGui.Parent = CoreGui
+else ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 ----------------------------------------------------
 -- KEY SYSTEM GUI
@@ -505,11 +487,13 @@ createToggle(mainPage, "Auto Teleport Map", function(enabled)
 	if enabled and autoFlyEnabled then autoFlyEnabled = false end
 end)
 
+-- FITUR BARU: AUTO CHECKPOINT TERBANG
 createToggle(mainPage, "Auto Checkpoint Terbang", function(enabled)
 	autoFlyEnabled = enabled
 	if enabled and autoEnabled then autoEnabled = false end
 end)
 
+-- CONTROL KECEPATAN TERBANG
 local flySpeedFrame = Instance.new("Frame", mainPage)
 flySpeedFrame.Size = UDim2.new(1, -10, 0, 32)
 flySpeedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
@@ -737,6 +721,7 @@ end)
 ----------------------------------------------------
 -- BACKGROUND LOOPS
 ----------------------------------------------------
+-- Loop Auto Teleport Instant
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -780,6 +765,7 @@ task.spawn(function()
 	end
 end)
 
+-- Loop Auto Checkpoint Terbang (Baru)
 task.spawn(function()
 	while true do
 		task.wait(0.2)
@@ -834,7 +820,7 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
 	local hum = char:WaitForChild("Humanoid", 5)
-	if hum then
+	if hum me
 		hum.WalkSpeed = walkSpeedValue
 		hum.UseJumpPower = true
 		hum.JumpPower = jumpPowerValue
