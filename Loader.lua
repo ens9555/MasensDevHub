@@ -92,7 +92,6 @@ local function teleportToPosition(vectorPos)
 	end)
 end
 
--- Function Terbang Smooth menuju Koordinat (Anti 2-Menit Freeze)
 local currentFlyTween = nil
 local function flyToPosition(vectorPos)
 	if not vectorPos then return end
@@ -164,7 +163,7 @@ local function makeDraggable(gui)
 end
 
 ----------------------------------------------------
--- GUI LAYOUT CONTAINER (DENGAN STRUKTUR ASLI ANDA)
+-- GUI LAYOUT CONTAINER
 ----------------------------------------------------
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MasensDevHub_V1"
@@ -487,13 +486,11 @@ createToggle(mainPage, "Auto Teleport Map", function(enabled)
 	if enabled and autoFlyEnabled then autoFlyEnabled = false end
 end)
 
--- FITUR BARU: AUTO CHECKPOINT TERBANG
 createToggle(mainPage, "Auto Checkpoint Terbang", function(enabled)
 	autoFlyEnabled = enabled
 	if enabled and autoEnabled then autoEnabled = false end
 end)
 
--- CONTROL KECEPATAN TERBANG
 local flySpeedFrame = Instance.new("Frame", mainPage)
 flySpeedFrame.Size = UDim2.new(1, -10, 0, 32)
 flySpeedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
@@ -721,7 +718,6 @@ end)
 ----------------------------------------------------
 -- BACKGROUND LOOPS
 ----------------------------------------------------
--- Loop Auto Teleport Instant
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -765,7 +761,6 @@ task.spawn(function()
 	end
 end)
 
--- Loop Auto Checkpoint Terbang (Baru)
 task.spawn(function()
 	while true do
 		task.wait(0.2)
@@ -820,7 +815,7 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
 	local hum = char:WaitForChild("Humanoid", 5)
-	if hum me
+	if hum then
 		hum.WalkSpeed = walkSpeedValue
 		hum.UseJumpPower = true
 		hum.JumpPower = jumpPowerValue
