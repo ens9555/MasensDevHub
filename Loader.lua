@@ -718,6 +718,7 @@ end)
 ----------------------------------------------------
 -- BACKGROUND LOOPS
 ----------------------------------------------------
+-- Loop Auto Teleport Instant
 task.spawn(function()
 	local lastStage = -1
 	local stuckCount = 0
@@ -761,16 +762,32 @@ task.spawn(function()
 	end
 end)
 
+-- Loop Auto Checkpoint Terbang (Urutan: 1-20 -> Summit -> BC -> Checkpoint 1)
 task.spawn(function()
 	while true do
 		task.wait(0.2)
 		if autoFlyEnabled then
 			pcall(function()
 				local currentStage = getPlayerStage()
-				local targetKey = (currentStage >= 20) and "Summit" or ("Checkpoint " .. (currentStage + 1))
 				
-				if checkpointCoords[targetKey] then
-					flyToPosition(checkpointCoords[targetKey])
+				if currentStage >= 20 then
+					-- Terbang dari Checkpoint 20 ke Summit
+					flyToPosition(checkpointCoords["Summit"])
+					if autoFlyEnabled then
+						-- Terbang dari Summit ke BC
+						flyToPosition(checkpointCoords["BC"])
+						if autoFlyEnabled then
+							-- Terbang dari BC ke Checkpoint 1
+							flyToPosition(checkpointCoords["Checkpoint 1"])
+						end
+					end
+				else
+					-- Terbang berurutan dari Checkpoint 1 sampai 20
+					local nextStage = currentStage + 1
+					local targetKey = "Checkpoint " .. nextStage
+					if checkpointCoords[targetKey] then
+						flyToPosition(checkpointCoords[targetKey])
+					end
 				end
 			end)
 		end
