@@ -19,10 +19,10 @@ if existingGui then existingGui:Destroy() end
 -- SYSTEM VARIABLES & VALID KEYS
 ----------------------------------------------------
 local VALID_KEYS = {
-	["15092026"] = true,
+	["21092026"] = true,
 	["Darmawan123@"] = true
 }
-local DEFAULT_GET_KEY = "https://link-center.net/9347872/iYyFL35U077Q"
+local DEFAULT_GET_KEY = "https://link-target.net/9347872/mhMuxYGqf8FD"
 
 local autoEnabled = false
 local autoFlyEnabled = false
