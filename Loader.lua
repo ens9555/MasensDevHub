@@ -16,7 +16,7 @@ local SAVE_FILE = "MD_MasensDevHub_KeySave.json"
 local KEY_EXPIRE_TIME = 12 * 3600 -- 12 Jam dalam detik (43.200 detik)
 
 -- LINK GET KEY
-local GET_KEY_LINK = "https://link-center.net/9347872/iYyFL35U077Q" 
+local GET_KEY_LINK = "https://link-hub.net/9347872/OeHjUSdeYOef" 
 
 local HWID = RbxAnalytics:GetClientId()
 
