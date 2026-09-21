@@ -1,6 +1,6 @@
 -- ====================================================================
 -- MASENSDEV HUB - KEY SYSTEM & LOADER
--- Red & Black Theme (0.4 Transparency) + 12 Hours Local Expire System
+-- Red & Black Theme (0.4 Transparency) + 12 Hours Fixed Expire System
 -- ====================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -20,13 +20,13 @@ local GET_KEY_LINK = "https://link-hub.net/9347872/OeHjUSdeYOef"
 
 local HWID = RbxAnalytics:GetClientId()
 
--- Helper Simpan Data Key + Timestamp
-local function saveKeyData(key)
+-- Helper Simpan Data Key + Timestamp (Hanya dipanggil saat LOGIN BARU)
+local function createNewSaveData(key)
     if writefile then
         local saveData = {
             key = key,
             hwid = HWID,
-            timestamp = os.time()
+            timestamp = os.time() -- Mencatat waktu pertama kali login
         }
         writefile(SAVE_FILE, HttpService:JSONEncode(saveData))
     end
@@ -40,7 +40,8 @@ local function clearSavedKey()
 end
 
 -- Fungsi Validasi Key Online & HWID Lock
-local function checkKey(userKey)
+-- Parameter isNewLogin menentukan apakah timestamp akan dicatat ulang atau tidak
+local function checkKey(userKey, isNewLogin)
     local success, response = pcall(function()
         return game:HttpGet(KEY_LIST_URL)
     end)
@@ -60,7 +61,10 @@ local function checkKey(userKey)
     local keyData = data.KEYS[userKey]
     if keyData then
         if keyData.hwid == "" or keyData.hwid == HWID then
-            saveKeyData(userKey)
+            -- Hanya perbarui file simpanan & timestamp jika ini LOGIN BARU dari GUI
+            if isNewLogin then
+                createNewSaveData(userKey)
+            end
             return true, "Valid"
         else
             return false, "Key terkunci di device lain (HWID Lock)!"
@@ -80,7 +84,7 @@ local function executeMainScript()
     end
 end
 
--- 1. CEK AUTO-LOGIN & BATAS WAKTU 12 JAM
+-- 1. CEK AUTO-LOGIN & BATAS WAKTU 12 JAM (Dihitung dari timestamp pertama)
 if isfile and isfile(SAVE_FILE) then
     local readSuccess, fileContent = pcall(function()
         return readfile(SAVE_FILE)
@@ -96,8 +100,8 @@ if isfile and isfile(SAVE_FILE) then
             local timeElapsed = currentTime - parsedData.timestamp
             
             if timeElapsed < KEY_EXPIRE_TIME then
-                -- Key masih dalam rentang 12 Jam, lakukan validasi online
-                local isValid, _ = checkKey(parsedData.key)
+                -- Key masih dalam rentang 12 Jam asli, lakukan validasi online (isNewLogin = false)
+                local isValid, _ = checkKey(parsedData.key, false)
                 if isValid then
                     executeMainScript()
                     return
@@ -105,7 +109,7 @@ if isfile and isfile(SAVE_FILE) then
                     clearSavedKey()
                 end
             else
-                -- Sudah lewat dari 12 Jam
+                -- Sudah lewat dari 12 Jam sejak login pertama
                 clearSavedKey()
             end
         else
@@ -205,7 +209,8 @@ SubmitBtn.MouseButton1Click:Connect(function()
     local userKey = InputBox.Text
     SubmitBtn.Text = "Memeriksa..."
     
-    local success, msg = checkKey(userKey)
+    -- Pass 'true' karena ini adalah login baru via tombol GUI
+    local success, msg = checkKey(userKey, true)
     if success then
         SubmitBtn.Text = "BERHASIL!"
         task.wait(0.5)
