@@ -1,10 +1,9 @@
 -- ====================================================================
 -- MASENSDEV HUB - KEY SYSTEM & LOADER
--- Red & Black Theme (0.4 Transparency) + 12 Hours Fixed Expire System
+-- Red & Black Theme (0.4 Transparency) + Fixed 12 Hours Multi-Device System
 -- ====================================================================
 
 local HttpService = game:GetService("HttpService")
-local RbxAnalytics = game:GetService("RbxAnalyticsService")
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
@@ -18,14 +17,11 @@ local KEY_EXPIRE_TIME = 12 * 3600 -- 12 Jam dalam detik (43.200 detik)
 -- LINK GET KEY
 local GET_KEY_LINK = "https://link-hub.net/9347872/OeHjUSdeYOef" 
 
-local HWID = RbxAnalytics:GetClientId()
-
--- Helper Simpan Data Key + Timestamp (Hanya dipanggil saat LOGIN BARU)
+-- Helper Simpan Data Key + Timestamp (Hanya dipanggil saat PERTAMA KALI LOGIN)
 local function createNewSaveData(key)
     if writefile then
         local saveData = {
             key = key,
-            hwid = HWID,
             timestamp = os.time() -- Mencatat waktu pertama kali login
         }
         writefile(SAVE_FILE, HttpService:JSONEncode(saveData))
@@ -39,8 +35,7 @@ local function clearSavedKey()
     end
 end
 
--- Fungsi Validasi Key Online & HWID Lock
--- Parameter isNewLogin menentukan apakah timestamp akan dicatat ulang atau tidak
+-- Fungsi Validasi Key Online (Bisa untuk semua device)
 local function checkKey(userKey, isNewLogin)
     local success, response = pcall(function()
         return game:HttpGet(KEY_LIST_URL)
@@ -60,22 +55,18 @@ local function checkKey(userKey, isNewLogin)
 
     local keyData = data.KEYS[userKey]
     if keyData then
-        if keyData.hwid == "" or keyData.hwid == HWID then
-            -- Hanya perbarui file simpanan & timestamp jika ini LOGIN BARU dari GUI
-            if isNewLogin then
-                createNewSaveData(userKey)
-            end
-            return true, "Valid"
-        else
-            return false, "Key terkunci di device lain (HWID Lock)!"
+        -- Multi-device: Pengecekan HWID dilewati agar 1 key bisa dipakai bersama
+        if isNewLogin then
+            createNewSaveData(userKey)
         end
+        return true, "Valid"
     end
 
-    return false, "Key tidak valid / kedaluwarsa!"
+    return false, "Key tidak valid / tidak ditemukan!"
 end
 
 local function executeMainScript()
-    print("[MasensDev Hub] Key Valid! Memuat Main.lua...")
+    print("[MasensDev Hub] Memuat Main.lua...")
     local success, err = pcall(function()
         loadstring(game:HttpGet(MAIN_SCRIPT_URL))()
     end)
@@ -84,7 +75,7 @@ local function executeMainScript()
     end
 end
 
--- 1. CEK AUTO-LOGIN & BATAS WAKTU 12 JAM (Dihitung dari timestamp pertama)
+-- 1. CEK AUTO-LOGIN & BATAS WAKTU 12 JAM REAL-TIME
 if isfile and isfile(SAVE_FILE) then
     local readSuccess, fileContent = pcall(function()
         return readfile(SAVE_FILE)
@@ -100,9 +91,14 @@ if isfile and isfile(SAVE_FILE) then
             local timeElapsed = currentTime - parsedData.timestamp
             
             if timeElapsed < KEY_EXPIRE_TIME then
-                -- Key masih dalam rentang 12 Jam asli, lakukan validasi online (isNewLogin = false)
+                -- Key masih berlaku, validasi ke database online (isNewLogin = false agar timestamp tidak ter-reset)
                 local isValid, _ = checkKey(parsedData.key, false)
                 if isValid then
+                    local timeRemaining = KEY_EXPIRE_TIME - timeElapsed
+                    local hoursRemaining = math.floor(timeRemaining / 3600)
+                    local minsRemaining = math.floor((timeRemaining % 3600) / 60)
+                    
+                    print(string.format("[MasensDev Hub] Key Terverifikasi! Sisa waktu aktif: %d Jam %d Menit", hoursRemaining, minsRemaining))
                     executeMainScript()
                     return
                 else
@@ -110,6 +106,7 @@ if isfile and isfile(SAVE_FILE) then
                 end
             else
                 -- Sudah lewat dari 12 Jam sejak login pertama
+                print("[MasensDev Hub] Key sudah kedaluwarsa (lebih dari 12 Jam).")
                 clearSavedKey()
             end
         else
@@ -209,7 +206,7 @@ SubmitBtn.MouseButton1Click:Connect(function()
     local userKey = InputBox.Text
     SubmitBtn.Text = "Memeriksa..."
     
-    -- Pass 'true' karena ini adalah login baru via tombol GUI
+    -- Pass 'true' karena ini login pertama via GUI
     local success, msg = checkKey(userKey, true)
     if success then
         SubmitBtn.Text = "BERHASIL!"
