@@ -1,6 +1,6 @@
 -- ====================================================================
--- MASENSDEV HUB - KEY SYSTEM & LOADER
--- Red & Black Theme (0.4 Transparency) + Fixed 12 Hours Multi-Device System
+-- MASENSDEV HUB - KEY SYSTEM & LOADER (WITH FORCE RESET & VERSIONING)
+-- Red & Black Theme (0.4 Transparency) + Fixed 12 Hours System
 -- ====================================================================
 
 local HttpService = game:GetService("HttpService")
@@ -17,12 +17,13 @@ local KEY_EXPIRE_TIME = 12 * 3600 -- 12 Jam dalam detik (43.200 detik)
 -- LINK GET KEY
 local GET_KEY_LINK = "https://link-hub.net/9347872/OeHjUSdeYOef" 
 
--- Helper Simpan Data Key + Timestamp (Hanya dipanggil saat PERTAMA KALI LOGIN)
-local function createNewSaveData(key)
+-- Helper Simpan Data Key + Timestamp + Version
+local function createNewSaveData(key, dbVersion)
     if writefile then
         local saveData = {
             key = key,
-            timestamp = os.time() -- Mencatat waktu pertama kali login
+            timestamp = os.time(),
+            version = dbVersion or 1
         }
         writefile(SAVE_FILE, HttpService:JSONEncode(saveData))
     end
@@ -31,44 +32,75 @@ end
 -- Helper Hapus Data Key
 local function clearSavedKey()
     if isfile and isfile(SAVE_FILE) and delfile then
-        delfile(SAVE_FILE)
+        pcall(function() delfile(SAVE_FILE) end)
     end
 end
 
--- Fungsi Validasi Key Online (Bisa untuk semua device)
-local function checkKey(userKey, isNewLogin)
+-- Fungsi Validasi Key Online
+local function checkKey(userKey, isNewLogin, localSavedVersion)
+    -- Bypass Cache GitHub menggunakan query unik
+    local bypassUrl = KEY_LIST_URL .. "?nocache=" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999))
+    
     local success, response = pcall(function()
-        return game:HttpGet(KEY_LIST_URL)
+        return game:HttpGet(bypassUrl)
     end)
     
-    if not success or not response then
+    if not success or not response or response == "" then
         return false, "Gagal terhubung ke database key!"
     end
 
-    local decodeSuccess, data = pcall(function()
+    local data = nil
+
+    -- 1. Decode JSON
+    local decodeSuccess, jsonParsed = pcall(function()
         return HttpService:JSONDecode(response)
     end)
 
-    if not decodeSuccess or not data or not data.KEYS then
+    if decodeSuccess and jsonParsed then
+        data = jsonParsed
+    else
+        -- 2. Clean UTF-8 BOM & Retry
+        local cleanedResponse = string.gsub(response, "^%s*(.-)%s*$", "%1")
+        cleanedResponse = string.gsub(cleanedResponse, "^%x%x%x", "")
+        
+        local cleanSuccess, cleanParsed = pcall(function()
+            return HttpService:JSONDecode(cleanedResponse)
+        end)
+        if cleanSuccess and cleanParsed then
+            data = cleanParsed
+        end
+    end
+
+    if not data or type(data) ~= "table" or not data.KEYS then
         return false, "Format database key salah!"
     end
 
-    local keyData = data.KEYS[userKey]
-    if keyData then
-        -- Multi-device: Pengecekan HWID dilewati agar 1 key bisa dipakai bersama
-        if isNewLogin then
-            createNewSaveData(userKey)
-        end
-        return true, "Valid"
+    local currentDbVersion = data.version or 1
+
+    -- Pengecekan Versi Database (Reset Masal jika Version di GitHub berubah)
+    if localSavedVersion and localSavedVersion ~= currentDbVersion then
+        clearSavedKey()
+        return false, "Database di-reset! Silakan masukkan key baru."
     end
 
-    return false, "Key tidak valid / tidak ditemukan!"
+    -- Pengecekan Keberadaan Key di GitHub
+    local keyData = data.KEYS[userKey]
+    if keyData then
+        if isNewLogin then
+            createNewSaveData(userKey, currentDbVersion)
+        end
+        return true, "Valid"
+    else
+        -- Jika key lama tidak ada lagi di GitHub
+        clearSavedKey()
+        return false, "Key sudah tidak berlaku!"
+    end
 end
 
 local function executeMainScript()
     print("[MasensDev Hub] Memuat Main.lua...")
     local success, err = pcall(function()
-        loadstring(game:HttpGet(MAIN_SCRIPT_URL))()
+        loadstring(game:HttpGet(MAIN_SCRIPT_URL .. "?nocache=" .. tostring(os.time())))()
     end)
     if not success then
         warn("[MasensDev Hub] Gagal memuat Main.lua:", err)
@@ -91,8 +123,8 @@ if isfile and isfile(SAVE_FILE) then
             local timeElapsed = currentTime - parsedData.timestamp
             
             if timeElapsed < KEY_EXPIRE_TIME then
-                -- Key masih berlaku, validasi ke database online (isNewLogin = false agar timestamp tidak ter-reset)
-                local isValid, _ = checkKey(parsedData.key, false)
+                -- Validasi key & versi lokal langsung ke GitHub
+                local isValid, msg = checkKey(parsedData.key, false, parsedData.version)
                 if isValid then
                     local timeRemaining = KEY_EXPIRE_TIME - timeElapsed
                     local hoursRemaining = math.floor(timeRemaining / 3600)
@@ -102,10 +134,10 @@ if isfile and isfile(SAVE_FILE) then
                     executeMainScript()
                     return
                 else
+                    print("[MasensDev Hub] Auto-login gagal:", msg)
                     clearSavedKey()
                 end
             else
-                -- Sudah lewat dari 12 Jam sejak login pertama
                 print("[MasensDev Hub] Key sudah kedaluwarsa (lebih dari 12 Jam).")
                 clearSavedKey()
             end
@@ -206,7 +238,6 @@ SubmitBtn.MouseButton1Click:Connect(function()
     local userKey = InputBox.Text
     SubmitBtn.Text = "Memeriksa..."
     
-    -- Pass 'true' karena ini login pertama via GUI
     local success, msg = checkKey(userKey, true)
     if success then
         SubmitBtn.Text = "BERHASIL!"
