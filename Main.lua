@@ -22,7 +22,7 @@ local VALID_KEYS = {
 	["21092026"] = true,
 	["Darmawan123@"] = true
 }
-local DEFAULT_GET_KEY = "https://link-target.net/9347872/mhMuxYGqf8FD"
+local DEFAULT_GET_KEY = "https://link-center.net/9347872/iYyFL35U077Q"
 
 local autoEnabled = false
 local autoFlyEnabled = false
