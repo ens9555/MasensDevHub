@@ -1,6 +1,6 @@
 --[[
-    MasensDev V1.0 Soreya
-    Roblox Multi-Feature Teleport & Utility Hub (Clean Fix + Fly Checkpoint)
+    MasensDev V1.0 Soreya + Red & Black Theme (Number Input + Set Button)
+    Roblox Multi-Feature Teleport, Utility Hub & Auto Fishing Integrated
 ]]
 
 local Players = game:GetService("Players")
@@ -8,6 +8,8 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
 local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -19,7 +21,7 @@ if existingGui then existingGui:Destroy() end
 -- SYSTEM VARIABLES & VALID KEYS
 ----------------------------------------------------
 local VALID_KEYS = {
-	["21092026"] = true,
+	["NEWUPDATE"] = true,
 	["Darmawan123@"] = true
 }
 local DEFAULT_GET_KEY = "https://link-center.net/9347872/iYyFL35U077Q"
@@ -32,8 +34,17 @@ local invisibleEnabled = false
 local followEnabled = false
 local antiAfkEnabled = false
 
+-- AUTO FISHING & SELL POSITIONS
+local autoFishingEnabled = false
+local isMiniGameActive = false
+local SLOW_DELAY = 1.0  
+local FAST_DELAY = 0.01 
+local FISHING_SPOT = Vector3.new(-9008.76, 1252.14, -6633.96)
+local WATER_LOOK_AT = Vector3.new(-9008.76, 1252.14, -6700.0)
+local SELL_NPC_SPOT = Vector3.new(-6684.29, 1329.67, -9955.31)
+
 local tpDelay = 1.5
-local flySpeed = 100 -- Kecepatan terbang (Studs per detik)
+local flySpeed = 100
 local walkSpeedValue = 16
 local jumpPowerValue = 50
 local selectedPlayerTarget = nil
@@ -78,7 +89,17 @@ local function copyToClipboardText(text)
 	end
 end
 
-local function teleportToPosition(vectorPos)
+local function clickCenterScreen()
+	local viewportSize = workspace.CurrentCamera.ViewportSize
+	local centerX = viewportSize.X / 2
+	local centerY = viewportSize.Y / 2
+
+	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+	task.wait(0.01)
+	VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+end
+
+local function teleportToPosition(vectorPos, lookAtPos)
 	if not vectorPos then return end
 	pcall(function()
 		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -87,7 +108,30 @@ local function teleportToPosition(vectorPos)
 			if LocalPlayer.RequestStreamAroundAsync then
 				pcall(function() LocalPlayer:RequestStreamAroundAsync(vectorPos) end)
 			end
-			char:PivotTo(CFrame.new(vectorPos + Vector3.new(0, 1.5, 0)))
+			local targetCFrame = CFrame.new(vectorPos + Vector3.new(0, 1.5, 0))
+			if lookAtPos then
+				targetCFrame = CFrame.new(vectorPos + Vector3.new(0, 1.5, 0), lookAtPos)
+			end
+			char:PivotTo(targetCFrame)
+		end
+	end)
+end
+
+local function equipHotbarOne()
+	pcall(function()
+		local char = LocalPlayer.Character
+		if not char then return end
+		local humanoid = char:FindFirstChildOfClass("Humanoid")
+		
+		local holdingTool = char:FindFirstChildOfClass("Tool")
+		if not holdingTool then
+			local backpackTools = LocalPlayer.Backpack:GetChildren()
+			if #backpackTools > 0 then
+				local firstTool = backpackTools[1]
+				if firstTool and firstTool:IsA("Tool") and humanoid then
+					humanoid:EquipTool(firstTool)
+				end
+			end
 		end
 	end)
 end
@@ -175,22 +219,48 @@ elseif CoreGui:FindFirstChild("RobloxGui") then ScreenGui.Parent = CoreGui
 else ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
 ----------------------------------------------------
+-- TOMBOL TAP KANAN (SMART TAP FLOATING)
+----------------------------------------------------
+local rightTapBtn = Instance.new("TextButton")
+rightTapBtn.Name = "RightTapBtn"
+rightTapBtn.Size = UDim2.new(0, 55, 0, 55)
+rightTapBtn.Position = UDim2.new(1, -70, 0.5, -27)
+rightTapBtn.Text = "👆\nTap"
+rightTapBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rightTapBtn.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
+rightTapBtn.BorderSizePixel = 0
+rightTapBtn.Font = Enum.Font.SourceSansBold
+rightTapBtn.TextSize = 13
+rightTapBtn.Active = true
+rightTapBtn.Draggable = true
+rightTapBtn.Parent = ScreenGui
+
+Instance.new("UICorner", rightTapBtn).CornerRadius = UDim.new(1, 0)
+local tapStroke = Instance.new("UIStroke", rightTapBtn)
+tapStroke.Color = Color3.fromRGB(255, 50, 50)
+tapStroke.Thickness = 2
+
+rightTapBtn.MouseButton1Click:Connect(function()
+	clickCenterScreen()
+end)
+
+----------------------------------------------------
 -- KEY SYSTEM GUI
 ----------------------------------------------------
 local KeyFrame = Instance.new("Frame")
 KeyFrame.Name = "KeySystemFrame"
 KeyFrame.Size = UDim2.new(0, 320, 0, 210)
 KeyFrame.Position = UDim2.new(0.5, -160, 0.4, -105)
-KeyFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
-KeyFrame.BackgroundTransparency = 0.4
+KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
+KeyFrame.BackgroundTransparency = 0.3
 KeyFrame.Parent = ScreenGui
 Instance.new("UICorner", KeyFrame).CornerRadius = UDim.new(0, 12)
 makeDraggable(KeyFrame)
 
 local KeyTitleBar = Instance.new("Frame", KeyFrame)
 KeyTitleBar.Size = UDim2.new(1, 0, 0, 35)
-KeyTitleBar.BackgroundColor3 = Color3.fromRGB(15, 23, 36)
-KeyTitleBar.BackgroundTransparency = 0.4
+KeyTitleBar.BackgroundColor3 = Color3.fromRGB(30, 10, 10)
+KeyTitleBar.BackgroundTransparency = 0.3
 Instance.new("UICorner", KeyTitleBar).CornerRadius = UDim.new(0, 12)
 
 local KeyTitleText = Instance.new("TextLabel", KeyTitleBar)
@@ -198,7 +268,7 @@ KeyTitleText.Size = UDim2.new(1, -20, 1, 0)
 KeyTitleText.Position = UDim2.new(0, 10, 0, 0)
 KeyTitleText.BackgroundTransparency = 1
 KeyTitleText.Text = "MasensDev Hub - Key System"
-KeyTitleText.TextColor3 = Color3.fromRGB(0, 210, 255)
+KeyTitleText.TextColor3 = Color3.fromRGB(255, 60, 60)
 KeyTitleText.Font = Enum.Font.Gotham
 KeyTitleText.TextSize = 13
 KeyTitleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -207,10 +277,10 @@ local KeyInputBox = Instance.new("TextBox", KeyFrame)
 KeyInputBox.Name = "KeyInputBox"
 KeyInputBox.Size = UDim2.new(1, -30, 0, 36)
 KeyInputBox.Position = UDim2.new(0, 15, 0, 50)
-KeyInputBox.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-KeyInputBox.BackgroundTransparency = 0.4
+KeyInputBox.BackgroundColor3 = Color3.fromRGB(25, 15, 15)
+KeyInputBox.BackgroundTransparency = 0.3
 KeyInputBox.PlaceholderText = "Masukkan Key Di Sini..."
-KeyInputBox.PlaceholderColor3 = Color3.fromRGB(130, 145, 160)
+KeyInputBox.PlaceholderColor3 = Color3.fromRGB(160, 110, 110)
 KeyInputBox.Text = ""
 KeyInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 KeyInputBox.Font = Enum.Font.Gotham
@@ -222,17 +292,17 @@ StatusLabel.Size = UDim2.new(1, -30, 0, 20)
 StatusLabel.Position = UDim2.new(0, 15, 0, 92)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "Status: Silakan Masukkan Key"
-StatusLabel.TextColor3 = Color3.fromRGB(180, 190, 200)
+StatusLabel.TextColor3 = Color3.fromRGB(220, 180, 180)
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.TextSize = 11
 
 local GetKeyBtn = Instance.new("TextButton", KeyFrame)
 GetKeyBtn.Size = UDim2.new(0.46, -5, 0, 35)
 GetKeyBtn.Position = UDim2.new(0, 15, 0, 120)
-GetKeyBtn.BackgroundColor3 = Color3.fromRGB(25, 38, 55)
-GetKeyBtn.BackgroundTransparency = 0.4
+GetKeyBtn.BackgroundColor3 = Color3.fromRGB(40, 15, 15)
+GetKeyBtn.BackgroundTransparency = 0.3
 GetKeyBtn.Text = "Get Key"
-GetKeyBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+GetKeyBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 GetKeyBtn.Font = Enum.Font.Gotham
 GetKeyBtn.TextSize = 12
 Instance.new("UICorner", GetKeyBtn).CornerRadius = UDim.new(0, 8)
@@ -240,8 +310,8 @@ Instance.new("UICorner", GetKeyBtn).CornerRadius = UDim.new(0, 8)
 local CheckKeyBtn = Instance.new("TextButton", KeyFrame)
 CheckKeyBtn.Size = UDim2.new(0.46, -5, 0, 35)
 CheckKeyBtn.Position = UDim2.new(0.54, 0, 0, 120)
-CheckKeyBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 210)
-CheckKeyBtn.BackgroundTransparency = 0.4
+CheckKeyBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+CheckKeyBtn.BackgroundTransparency = 0.3
 CheckKeyBtn.Text = "Check Key"
 CheckKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CheckKeyBtn.Font = Enum.Font.Gotham
@@ -252,7 +322,7 @@ GetKeyBtn.MouseButton1Click:Connect(function()
 	copyToClipboardText(DEFAULT_GET_KEY)
 	GetKeyBtn.Text = "Copied!"
 	StatusLabel.Text = "Key berhasil disalin ke Clipboard!"
-	StatusLabel.TextColor3 = Color3.fromRGB(0, 220, 150)
+	StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 	task.wait(1.5)
 	GetKeyBtn.Text = "Get Key"
 end)
@@ -264,10 +334,10 @@ local OpenBtn = Instance.new("TextButton")
 OpenBtn.Name = "OpenHubButton"
 OpenBtn.Size = UDim2.new(0, 40, 0, 40)
 OpenBtn.Position = UDim2.new(0.01, 0, 0.4, 0)
-OpenBtn.BackgroundColor3 = Color3.fromRGB(12, 18, 28)
-OpenBtn.BackgroundTransparency = 0.4
+OpenBtn.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
+OpenBtn.BackgroundTransparency = 0.3
 OpenBtn.Text = "MD"
-OpenBtn.TextColor3 = Color3.fromRGB(0, 200, 255)
+OpenBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 OpenBtn.Font = Enum.Font.Gotham
 OpenBtn.TextSize = 14
 OpenBtn.Visible = false
@@ -279,8 +349,8 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
 MainFrame.Size = UDim2.new(0, 520, 0, 360)
 MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(10, 14, 22)
-MainFrame.BackgroundTransparency = 0.6
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 8, 8)
+MainFrame.BackgroundTransparency = 0.3
 MainFrame.Parent = ScreenGui
 MainFrame.Visible = false
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
@@ -290,7 +360,7 @@ CheckKeyBtn.MouseButton1Click:Connect(function()
 	local inputKey = KeyInputBox.Text
 	if VALID_KEYS[inputKey] then
 		StatusLabel.Text = "Key Benar! Membuka GUI..."
-		StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+		StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 		task.wait(0.5)
 		KeyFrame:Destroy()
 		OpenBtn.Visible = true
@@ -303,16 +373,16 @@ end)
 
 local TopBar = Instance.new("Frame", MainFrame)
 TopBar.Size = UDim2.new(1, 0, 0, 35)
-TopBar.BackgroundColor3 = Color3.fromRGB(15, 23, 36)
-TopBar.BackgroundTransparency = 0.5
+TopBar.BackgroundColor3 = Color3.fromRGB(35, 10, 10)
+TopBar.BackgroundTransparency = 0.3
 Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
 
 local TitleText = Instance.new("TextLabel", TopBar)
 TitleText.Size = UDim2.new(1, -40, 1, 0)
 TitleText.Position = UDim2.new(0, 12, 0, 0)
 TitleText.BackgroundTransparency = 1
-TitleText.Text = "MasensDev V1.0 Soreya"
-TitleText.TextColor3 = Color3.fromRGB(0, 210, 255)
+TitleText.Text = "MasensDev V2.0 Soreya"
+TitleText.TextColor3 = Color3.fromRGB(255, 60, 60)
 TitleText.Font = Enum.Font.Gotham
 TitleText.TextSize = 13
 TitleText.TextXAlignment = Enum.TextXAlignment.Left
@@ -320,8 +390,8 @@ TitleText.TextXAlignment = Enum.TextXAlignment.Left
 local CloseBtn = Instance.new("TextButton", TopBar)
 CloseBtn.Size = UDim2.new(0, 25, 0, 25)
 CloseBtn.Position = UDim2.new(1, -30, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 70)
-CloseBtn.BackgroundTransparency = 0.4
+CloseBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+CloseBtn.BackgroundTransparency = 0.3
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 CloseBtn.Font = Enum.Font.Gotham
@@ -334,8 +404,8 @@ OpenBtn.MouseButton1Click:Connect(function() MainFrame.Visible = not MainFrame.V
 local SideBar = Instance.new("Frame", MainFrame)
 SideBar.Size = UDim2.new(0, 130, 1, -45)
 SideBar.Position = UDim2.new(0, 8, 0, 40)
-SideBar.BackgroundColor3 = Color3.fromRGB(14, 20, 30)
-SideBar.BackgroundTransparency = 0.6
+SideBar.BackgroundColor3 = Color3.fromRGB(22, 10, 10)
+SideBar.BackgroundTransparency = 0.3
 Instance.new("UICorner", SideBar).CornerRadius = UDim.new(0, 10)
 
 local SideList = Instance.new("UIListLayout", SideBar)
@@ -357,7 +427,7 @@ local function createPage(name)
 	page.BackgroundTransparency = 1
 	page.CanvasSize = UDim2.new(0, 0, 0, 0)
 	page.ScrollBarThickness = 3
-	page.ScrollBarImageColor3 = Color3.fromRGB(0, 170, 255)
+	page.ScrollBarImageColor3 = Color3.fromRGB(220, 40, 40)
 	page.Visible = false
 	
 	local layout = Instance.new("UIListLayout", page)
@@ -373,6 +443,7 @@ local function createPage(name)
 end
 
 local mainPage = createPage("Main")
+local fishingPage = createPage("Fishing")
 local miscPage = createPage("Misc")
 local settingsPage = createPage("Settings")
 
@@ -380,10 +451,10 @@ local tabButtons = {}
 local function addTab(name, layoutOrder)
 	local btn = Instance.new("TextButton", SideBar)
 	btn.Size = UDim2.new(1, -12, 0, 35)
-	btn.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
-	btn.BackgroundTransparency = 0.5
+	btn.BackgroundColor3 = Color3.fromRGB(35, 15, 15)
+	btn.BackgroundTransparency = 0.3
 	btn.Text = name
-	btn.TextColor3 = Color3.fromRGB(160, 180, 200)
+	btn.TextColor3 = Color3.fromRGB(200, 160, 160)
 	btn.Font = Enum.Font.Gotham
 	btn.TextSize = 12
 	btn.LayoutOrder = layoutOrder
@@ -392,11 +463,11 @@ local function addTab(name, layoutOrder)
 	btn.MouseButton1Click:Connect(function()
 		for _, p in pairs(pages) do p.Visible = false end
 		for _, b in pairs(tabButtons) do
-			b.BackgroundColor3 = Color3.fromRGB(20, 30, 45)
-			b.TextColor3 = Color3.fromRGB(160, 180, 200)
+			b.BackgroundColor3 = Color3.fromRGB(35, 15, 15)
+			b.TextColor3 = Color3.fromRGB(200, 160, 160)
 		end
 		pages[name].Visible = true
-		btn.BackgroundColor3 = Color3.fromRGB(0, 120, 190)
+		btn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
 		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	end)
 	
@@ -404,11 +475,12 @@ local function addTab(name, layoutOrder)
 end
 
 addTab("Main", 1)
-addTab("Misc", 2)
-addTab("Settings", 3)
+addTab("Fishing", 2)
+addTab("Misc", 3)
+addTab("Settings", 4)
 
 pages["Main"].Visible = true
-tabButtons[1].BackgroundColor3 = Color3.fromRGB(0, 120, 190)
+tabButtons[1].BackgroundColor3 = Color3.fromRGB(180, 30, 30)
 tabButtons[1].TextColor3 = Color3.fromRGB(255, 255, 255)
 
 ----------------------------------------------------
@@ -417,8 +489,8 @@ tabButtons[1].TextColor3 = Color3.fromRGB(255, 255, 255)
 local function createButton(parent, text, bgColor, callback)
 	local btn = Instance.new("TextButton", parent)
 	btn.Size = UDim2.new(1, -10, 0, 32)
-	btn.BackgroundColor3 = bgColor or Color3.fromRGB(0, 140, 210)
-	btn.BackgroundTransparency = 0.4
+	btn.BackgroundColor3 = bgColor or Color3.fromRGB(160, 30, 30)
+	btn.BackgroundTransparency = 0.3
 	btn.Text = text
 	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	btn.Font = Enum.Font.Gotham
@@ -431,23 +503,109 @@ end
 
 local function createToggle(parent, text, callback)
 	local state = false
-	local btn = createButton(parent, text .. ": OFF", Color3.fromRGB(30, 45, 60), function(self)
+	local btn = createButton(parent, text .. ": OFF", Color3.fromRGB(45, 20, 20), function(self)
 		state = not state
 		self.Text = text .. (state and ": ON" or ": OFF")
-		self.BackgroundColor3 = state and Color3.fromRGB(0, 170, 120) or Color3.fromRGB(30, 45, 60)
+		self.BackgroundColor3 = state and Color3.fromRGB(180, 30, 30) or Color3.fromRGB(45, 20, 20)
 		callback(state)
 	end)
 	return btn
 end
 
+-- COMPONENT UNTUK INPUT ANGKA + TOMBOL SET
+local function createNumberInput(parent, labelText, defaultValue, callback)
+	local frame = Instance.new("Frame", parent)
+	frame.Size = UDim2.new(1, -10, 0, 32)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 15, 15)
+	frame.BackgroundTransparency = 0.3
+	Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+	local label = Instance.new("TextLabel", frame)
+	label.Size = UDim2.new(0.5, -5, 1, 0)
+	label.Position = UDim2.new(0, 8, 0, 0)
+	label.BackgroundTransparency = 1
+	label.Text = labelText .. ": " .. defaultValue
+	label.TextColor3 = Color3.fromRGB(240, 220, 220)
+	label.Font = Enum.Font.Gotham
+	label.TextSize = 11
+	label.TextXAlignment = Enum.TextXAlignment.Left
+
+	local inputBox = Instance.new("TextBox", frame)
+	inputBox.Size = UDim2.new(0, 50, 0, 24)
+	inputBox.Position = UDim2.new(1, -100, 0, 4)
+	inputBox.BackgroundColor3 = Color3.fromRGB(20, 10, 10)
+	inputBox.BackgroundTransparency = 0.3
+	inputBox.Text = tostring(defaultValue)
+	inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+	inputBox.Font = Enum.Font.Gotham
+	inputBox.TextSize = 11
+	Instance.new("UICorner", inputBox).CornerRadius = UDim.new(0, 6)
+
+	local setBtn = Instance.new("TextButton", frame)
+	setBtn.Size = UDim2.new(0, 40, 0, 24)
+	setBtn.Position = UDim2.new(1, -45, 0, 4)
+	setBtn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+	setBtn.BackgroundTransparency = 0.3
+	setBtn.Text = "Set"
+	setBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	setBtn.Font = Enum.Font.Gotham
+	setBtn.TextSize = 11
+	Instance.new("UICorner", setBtn).CornerRadius = UDim.new(0, 6)
+
+	local function applyValue()
+		local val = tonumber(inputBox.Text)
+		if val then
+			label.Text = labelText .. ": " .. val
+			callback(val)
+		else
+			inputBox.Text = tostring(defaultValue)
+		end
+	end
+
+	setBtn.MouseButton1Click:Connect(applyValue)
+	inputBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then applyValue() end
+	end)
+
+	return frame
+end
+
+----------------------------------------------------
+-- DETEKSI REMOTEEVENT MINIGAME
+----------------------------------------------------
+local function listenMiniGameRemote()
+	pcall(function()
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local tool = char:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+		
+		if tool and tool:FindFirstChild("Mechanics") and tool.Mechanics:FindFirstChild("Remotes") then
+			local miniGameRemote = tool.Mechanics.Remotes:FindFirstChild("MiniGame")
+			if miniGameRemote and miniGameRemote:IsA("RemoteEvent") then
+				miniGameRemote.OnClientEvent:Connect(function(...)
+					isMiniGameActive = true
+					task.delay(3, function()
+						isMiniGameActive = false
+					end)
+				end)
+			end
+		end
+	end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(1)
+	listenMiniGameRemote()
+end)
+listenMiniGameRemote()
+
 ----------------------------------------------------
 -- TAB 1: MAIN
 ----------------------------------------------------
-local cpDropBtn = createButton(mainPage, "Pilih Map Target... ▼", Color3.fromRGB(25, 35, 50))
+local cpDropBtn = createButton(mainPage, "Pilih Map Target... ▼", Color3.fromRGB(40, 20, 20))
 local cpScroll = Instance.new("ScrollingFrame", mainPage)
 cpScroll.Size = UDim2.new(1, -10, 0, 100)
-cpScroll.BackgroundColor3 = Color3.fromRGB(15, 22, 32)
-cpScroll.BackgroundTransparency = 0.4
+cpScroll.BackgroundColor3 = Color3.fromRGB(25, 12, 12)
+cpScroll.BackgroundTransparency = 0.3
 cpScroll.Visible = false
 cpScroll.ScrollBarThickness = 3
 Instance.new("UICorner", cpScroll).CornerRadius = UDim.new(0, 8)
@@ -460,7 +618,7 @@ end)
 
 for i = 1, 20 do
 	local name = "Checkpoint " .. i
-	createButton(cpScroll, name, Color3.fromRGB(25, 38, 55), function()
+	createButton(cpScroll, name, Color3.fromRGB(45, 20, 20), function()
 		selectedCoord = checkpointCoords[name]
 		cpDropBtn.Text = name
 		cpScroll.Visible = false
@@ -468,7 +626,7 @@ for i = 1, 20 do
 end
 
 for _, item in ipairs({"Summit", "BC"}) do
-	createButton(cpScroll, item, Color3.fromRGB(45, 35, 65), function()
+	createButton(cpScroll, item, Color3.fromRGB(65, 25, 25), function()
 		selectedCoord = checkpointCoords[item]
 		cpDropBtn.Text = item
 		cpScroll.Visible = false
@@ -477,7 +635,7 @@ end
 
 cpDropBtn.MouseButton1Click:Connect(function() cpScroll.Visible = not cpScroll.Visible end)
 
-createButton(mainPage, "Teleport Manual Ke Map", Color3.fromRGB(0, 140, 210), function()
+createButton(mainPage, "Teleport Manual Ke Map", Color3.fromRGB(180, 30, 30), function()
 	if selectedCoord then teleportToPosition(selectedCoord) end
 end)
 
@@ -491,71 +649,21 @@ createToggle(mainPage, "Auto Checkpoint Terbang", function(enabled)
 	if enabled and autoEnabled then autoEnabled = false end
 end)
 
-local flySpeedFrame = Instance.new("Frame", mainPage)
-flySpeedFrame.Size = UDim2.new(1, -10, 0, 32)
-flySpeedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-flySpeedFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", flySpeedFrame).CornerRadius = UDim.new(0, 8)
-
-local flySpeedLabel = Instance.new("TextLabel", flySpeedFrame)
-flySpeedLabel.Size = UDim2.new(0.6, 0, 1, 0)
-flySpeedLabel.Position = UDim2.new(0, 8, 0, 0)
-flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
-flySpeedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-flySpeedLabel.Font = Enum.Font.Gotham
-flySpeedLabel.TextSize = 11
-flySpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local minusFlySpeed = createButton(flySpeedFrame, "-", Color3.fromRGB(40, 50, 65), function()
-	flySpeed = math.max(10, flySpeed - 20)
-	flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
+-- INPUT ANGKA KECEPATAN TERBANG
+createNumberInput(mainPage, "Kecepatan Terbang", flySpeed, function(val)
+	flySpeed = math.max(10, val)
 end)
-minusFlySpeed.Size = UDim2.new(0, 30, 0, 24)
-minusFlySpeed.Position = UDim2.new(1, -70, 0, 4)
 
-local plusFlySpeed = createButton(flySpeedFrame, "+", Color3.fromRGB(40, 50, 65), function()
-	flySpeed = flySpeed + 20
-	flySpeedLabel.Text = "Kecepatan Terbang: " .. flySpeed
+-- INPUT ANGKA JEDA AUTO TP
+createNumberInput(mainPage, "Jeda Auto TP", tpDelay, function(val)
+	tpDelay = math.max(0.1, val)
 end)
-plusFlySpeed.Size = UDim2.new(0, 30, 0, 24)
-plusFlySpeed.Position = UDim2.new(1, -35, 0, 4)
 
-local speedFrame = Instance.new("Frame", mainPage)
-speedFrame.Size = UDim2.new(1, -10, 0, 32)
-speedFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-speedFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", speedFrame).CornerRadius = UDim.new(0, 8)
-
-local speedLabel = Instance.new("TextLabel", speedFrame)
-speedLabel.Size = UDim2.new(0.6, 0, 1, 0)
-speedLabel.Position = UDim2.new(0, 8, 0, 0)
-speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Jeda Auto TP: " .. string.format("%.1fs", tpDelay)
-speedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.TextSize = 11
-speedLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local minusDelay = createButton(speedFrame, "-", Color3.fromRGB(40, 50, 65), function()
-	tpDelay = math.max(0.2, tpDelay - 0.2)
-	speedLabel.Text = "Jeda Auto TP: " .. string.format("%.1fs", tpDelay)
-end)
-minusDelay.Size = UDim2.new(0, 30, 0, 24)
-minusDelay.Position = UDim2.new(1, -70, 0, 4)
-
-local plusDelay = createButton(speedFrame, "+", Color3.fromRGB(40, 50, 65), function()
-	tpDelay = tpDelay + 0.2
-	speedLabel.Text = "Jeda Auto TP: " .. string.format("%.1fs", tpDelay)
-end)
-plusDelay.Size = UDim2.new(0, 30, 0, 24)
-plusDelay.Position = UDim2.new(1, -35, 0, 4)
-
-local plDropBtn = createButton(mainPage, "Pilih Pemain Target... ▼", Color3.fromRGB(25, 35, 50))
+local plDropBtn = createButton(mainPage, "Pilih Pemain Target... ▼", Color3.fromRGB(40, 20, 20))
 local plScroll = Instance.new("ScrollingFrame", mainPage)
 plScroll.Size = UDim2.new(1, -10, 0, 90)
-plScroll.BackgroundColor3 = Color3.fromRGB(15, 22, 32)
-plScroll.BackgroundTransparency = 0.4
+plScroll.BackgroundColor3 = Color3.fromRGB(25, 12, 12)
+plScroll.BackgroundTransparency = 0.3
 plScroll.Visible = false
 plScroll.ScrollBarThickness = 3
 Instance.new("UICorner", plScroll).CornerRadius = UDim.new(0, 8)
@@ -568,7 +676,7 @@ local function updatePlayerList()
 	end
 	for _, p in pairs(Players:GetPlayers()) do
 		if p ~= LocalPlayer then
-			createButton(plScroll, p.DisplayName .. " (@" .. p.Name .. ")", Color3.fromRGB(25, 38, 55), function()
+			createButton(plScroll, p.DisplayName .. " (@" .. p.Name .. ")", Color3.fromRGB(45, 20, 20), function()
 				selectedPlayerTarget = p
 				plDropBtn.Text = p.DisplayName
 				plScroll.Visible = false
@@ -583,7 +691,7 @@ plDropBtn.MouseButton1Click:Connect(function()
 	plScroll.Visible = not plScroll.Visible
 end)
 
-createButton(mainPage, "Teleport ke Pemain Target", Color3.fromRGB(0, 160, 150), function()
+createButton(mainPage, "Teleport ke Pemain Target", Color3.fromRGB(150, 25, 25), function()
 	if not selectedPlayerTarget then updatePlayerList() end
 	if selectedPlayerTarget then
 		task.spawn(function()
@@ -612,83 +720,47 @@ createToggle(mainPage, "Mode Follow Pemain Target", function(enabled)
 end)
 
 ----------------------------------------------------
--- TAB 2: MISC
+-- TAB 2: FISHING
 ----------------------------------------------------
-local wsFrame = Instance.new("Frame", miscPage)
-wsFrame.Size = UDim2.new(1, -10, 0, 32)
-wsFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-wsFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", wsFrame).CornerRadius = UDim.new(0, 8)
+createToggle(fishingPage, "🎣 Auto Fishing System", function(enabled)
+	autoFishingEnabled = enabled
+	if enabled then
+		equipHotbarOne()
+		teleportToPosition(FISHING_SPOT, WATER_LOOK_AT)
+		rightTapBtn.BackgroundColor3 = Color3.fromRGB(220, 30, 30)
+		rightTapBtn.Text = "⚡\nAUTO"
+	else
+		rightTapBtn.BackgroundColor3 = Color3.fromRGB(180, 20, 20)
+		rightTapBtn.Text = "👆\nTap"
+		isMiniGameActive = false
+	end
+end)
 
-local wsLabel = Instance.new("TextLabel", wsFrame)
-wsLabel.Size = UDim2.new(0.6, 0, 1, 0)
-wsLabel.Position = UDim2.new(0, 8, 0, 0)
-wsLabel.BackgroundTransparency = 1
-wsLabel.Text = "WalkSpeed: " .. walkSpeedValue
-wsLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-wsLabel.Font = Enum.Font.Gotham
-wsLabel.TextSize = 11
-wsLabel.TextXAlignment = Enum.TextXAlignment.Left
+-- TOMBOL TELEPORT KE NPC SELL FISH
+createButton(fishingPage, "🚶 NPC Sell Fish", Color3.fromRGB(200, 50, 50), function()
+	teleportToPosition(SELL_NPC_SPOT)
+end)
 
-local minusWs = createButton(wsFrame, "-", Color3.fromRGB(40, 50, 65), function()
-	walkSpeedValue = math.max(0, walkSpeedValue - 5)
-	wsLabel.Text = "WalkSpeed: " .. walkSpeedValue
+----------------------------------------------------
+-- TAB 3: MISC
+----------------------------------------------------
+-- INPUT ANGKA WALKSPEED
+createNumberInput(miscPage, "WalkSpeed", walkSpeedValue, function(val)
+	walkSpeedValue = math.max(0, val)
 	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
 		LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = walkSpeedValue
 	end
 end)
-minusWs.Size = UDim2.new(0, 30, 0, 24)
-minusWs.Position = UDim2.new(1, -70, 0, 4)
 
-local plusWs = createButton(wsFrame, "+", Color3.fromRGB(40, 50, 65), function()
-	walkSpeedValue = walkSpeedValue + 5
-	wsLabel.Text = "WalkSpeed: " .. walkSpeedValue
-	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-		LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = walkSpeedValue
-	end
-end)
-plusWs.Size = UDim2.new(0, 30, 0, 24)
-plusWs.Position = UDim2.new(1, -35, 0, 4)
-
-local jpFrame = Instance.new("Frame", miscPage)
-jpFrame.Size = UDim2.new(1, -10, 0, 32)
-jpFrame.BackgroundColor3 = Color3.fromRGB(20, 30, 42)
-jpFrame.BackgroundTransparency = 0.5
-Instance.new("UICorner", jpFrame).CornerRadius = UDim.new(0, 8)
-
-local jpLabel = Instance.new("TextLabel", jpFrame)
-jpLabel.Size = UDim2.new(0.6, 0, 1, 0)
-jpLabel.Position = UDim2.new(0, 8, 0, 0)
-jpLabel.BackgroundTransparency = 1
-jpLabel.Text = "JumpPower: " .. jumpPowerValue
-jpLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-jpLabel.Font = Enum.Font.Gotham
-jpLabel.TextSize = 11
-jpLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local minusJp = createButton(jpFrame, "-", Color3.fromRGB(40, 50, 65), function()
-	jumpPowerValue = math.max(0, jumpPowerValue - 10)
-	jpLabel.Text = "JumpPower: " .. jumpPowerValue
+-- INPUT ANGKA JUMPPOWER
+createNumberInput(miscPage, "JumpPower", jumpPowerValue, function(val)
+	jumpPowerValue = math.max(0, val)
 	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
 		local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 		hum.UseJumpPower = true
 		hum.JumpPower = jumpPowerValue
 	end
 end)
-minusJp.Size = UDim2.new(0, 30, 0, 24)
-minusJp.Position = UDim2.new(1, -70, 0, 4)
-
-local plusJp = createButton(jpFrame, "+", Color3.fromRGB(40, 50, 65), function()
-	jumpPowerValue = jumpPowerValue + 10
-	jpLabel.Text = "JumpPower: " .. jumpPowerValue
-	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-		local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-		hum.UseJumpPower = true
-		hum.JumpPower = jumpPowerValue
-	end
-end)
-plusJp.Size = UDim2.new(0, 30, 0, 24)
-plusJp.Position = UDim2.new(1, -35, 0, 4)
 
 createToggle(miscPage, "Noclip Mode", function(enabled) noclipEnabled = enabled end)
 createToggle(miscPage, "Infinite Jump", function(enabled) infJumpEnabled = enabled end)
@@ -705,19 +777,30 @@ createToggle(miscPage, "Invisible (Local)", function(enabled)
 end)
 
 ----------------------------------------------------
--- TAB 3: SETTINGS
+-- TAB 4: SETTINGS
 ----------------------------------------------------
 createToggle(settingsPage, "Anti-AFK System", function(enabled)
 	antiAfkEnabled = enabled
 end)
 
-createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(180, 50, 70), function()
+createButton(settingsPage, "Rejoin Server Current", Color3.fromRGB(160, 20, 20), function()
 	TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end)
 
 ----------------------------------------------------
 -- BACKGROUND LOOPS
 ----------------------------------------------------
+-- Loop Auto Fishing (Smart Tap)
+task.spawn(function()
+	while true do
+		local currentDelay = (isMiniGameActive and FAST_DELAY) or SLOW_DELAY
+		task.wait(currentDelay)
+		if autoFishingEnabled then
+			clickCenterScreen()
+		end
+	end
+end)
+
 -- Loop Auto Teleport Instant
 task.spawn(function()
 	local lastStage = -1
@@ -762,7 +845,7 @@ task.spawn(function()
 	end
 end)
 
--- Loop Auto Checkpoint Terbang (Urutan: 1-20 -> Summit -> BC -> Checkpoint 1)
+-- Loop Auto Checkpoint Terbang
 task.spawn(function()
 	while true do
 		task.wait(0.2)
@@ -771,18 +854,14 @@ task.spawn(function()
 				local currentStage = getPlayerStage()
 				
 				if currentStage >= 20 then
-					-- Terbang dari Checkpoint 20 ke Summit
 					flyToPosition(checkpointCoords["Summit"])
 					if autoFlyEnabled then
-						-- Terbang dari Summit ke BC
 						flyToPosition(checkpointCoords["BC"])
 						if autoFlyEnabled then
-							-- Terbang dari BC ke Checkpoint 1
 							flyToPosition(checkpointCoords["Checkpoint 1"])
 						end
 					end
 				else
-					-- Terbang berurutan dari Checkpoint 1 sampai 20
 					local nextStage = currentStage + 1
 					local targetKey = "Checkpoint " .. nextStage
 					if checkpointCoords[targetKey] then
@@ -822,7 +901,6 @@ UserInputService.JumpRequest:Connect(function()
 	end
 end)
 
-local VirtualUser = game:GetService("VirtualUser")
 LocalPlayer.Idled:Connect(function()
 	if antiAfkEnabled then
 		VirtualUser:CaptureController()
